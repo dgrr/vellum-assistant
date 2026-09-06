@@ -1,11 +1,14 @@
 /**
  * Execute a single registered tool in-process, outside the agent loop.
  *
- * This is the entry point behind `assistant tools run <name>`: the CLI runs
- * the tool directly from the filesystem (no daemon, no IPC), the same way the
- * memory-retrospective CLI runs its job in-process. It loads the tool registry
- * (core built-ins plus workspace tools discovered under the workspace dir) and
- * dispatches through the normal {@link ToolExecutor}.
+ * This is the entry point behind `assistant tools run <name>`, and it runs in
+ * whichever process resolves the name. Normally that is the daemon, reached
+ * over IPC by the `tools_run_post` route, because the tool registry is
+ * per-process and skill, plugin, and MCP tools live only there. With no daemon
+ * running the CLI calls this directly instead, where the registry holds what it
+ * loads from the filesystem: core built-ins plus workspace tools discovered
+ * under the workspace dir. Either way, dispatch goes through the normal
+ * {@link ToolExecutor}.
  *
  * Permission model: execution runs non-interactive and non-guardian
  * (`trustClass: "unknown"`). Read-only / low-risk tools execute; any tool whose
