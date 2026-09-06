@@ -10,12 +10,20 @@
  * under the workspace dir. Either way, dispatch goes through the normal
  * {@link ToolExecutor}.
  *
- * Permission model: execution runs non-interactive and non-guardian
- * (`trustClass: "unknown"`). Read-only / low-risk tools execute; any tool whose
- * permission check resolves to a prompt is auto-denied with a clear message in
- * the result rather than blocking (there is no client to approve it). This is
- * the least-privilege default — it never silently performs a side-effecting
- * action the agent loop would have asked a human to confirm.
+ * Permission model: the caller is the guardian (`tools_run_post` admits local
+ * principals holding `settings.write`, and the fallback path is the owner's own
+ * shell), invoking a tool they named themselves with no client attached to
+ * approve anything. The context says exactly that: `trustClass: "guardian"`,
+ * `isInteractive: false`, `noApprovalChannel: true`. Read-only and low-risk
+ * tools execute; anything whose permission check resolves to a prompt is denied
+ * with that reason in the result, because `noApprovalChannel` also bars the
+ * unattended auto-approve shortcuts a guardian would otherwise get.
+ *
+ * Guardian trust is what lets extension-owned tools run at all. The
+ * sensitive-tool gate treats every MCP, plugin, and non-bundled-skill tool as
+ * unvetted code that needs a human behind it; a person typing the tool's name
+ * is that human, and no model chose it. Anything riskier than the guardian's
+ * headless threshold still stops at the gate.
  */
 
 import { v4 as uuid } from "uuid";
@@ -69,8 +77,8 @@ export async function runToolStandalone(
   const workingDir = opts?.workingDir ?? getWorkspaceDir();
 
   // No interactive client is attached, so the prompter's sendToClient is never
-  // exercised: with a non-guardian, non-interactive context the permission
-  // checker auto-denies prompt decisions before reaching the prompter.
+  // exercised: `noApprovalChannel` makes the permission checker deny prompt
+  // decisions before reaching the prompter.
   const executor = new ToolExecutor(new PermissionPrompter(() => {}));
 
   const context: ToolContext = {
@@ -78,7 +86,8 @@ export async function runToolStandalone(
     workingDir,
     requestId: uuid(),
     isInteractive: false,
-    trustClass: "unknown",
+    trustClass: "guardian",
+    noApprovalChannel: true,
     signal: opts?.signal,
   };
 

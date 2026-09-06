@@ -687,15 +687,16 @@ function buildRegisteredToolEntries(): ToolListEntry[] {
  *
  * The daemon runs it rather than the CLI process because the registry is
  * per-process: skill, plugin, and MCP tools are registered here over the
- * daemon's lifetime and exist nowhere else, so a CLI process that resolved the
- * name itself could only ever reach core built-ins and workspace tools. That is
- * the gap this route closes. `tools list` already reads this registry over
- * IPC, so it has always shown tools that `tools run` then could not find.
+ * daemon's lifetime and exist nowhere else, so a CLI process that resolves the
+ * name itself reaches only core built-ins and workspace tools. `tools list`
+ * reads this same registry over IPC, so both halves of the command agree on
+ * what exists.
  *
- * Permission behavior is {@link runToolStandalone}'s and does not change here:
- * the run is non-interactive and non-guardian, so read-only / low-risk tools
- * execute and anything that would prompt is denied in the result. Reaching a
- * larger registry does not mean reaching a larger set of permitted actions.
+ * Permission behavior is {@link runToolStandalone}'s: the caller is the
+ * guardian with no approval channel, so read-only and low-risk tools execute
+ * and anything that would prompt is denied in the result. The route's own
+ * contribution to that is the identity it admits, which the policy below pins
+ * to local principals holding `settings.write`.
  */
 async function handleToolRun({ body = {} }: RouteHandlerArgs) {
   const { toolName, input } = body as {
